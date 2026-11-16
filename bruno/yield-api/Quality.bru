@@ -1,0 +1,20 @@
+meta {
+  name: Quality
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{appUrl}}/api/quality
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.rejectedRows: isArray
+}
+
+docs {
+  Hours without a valid value, corrected hours, rejected rows and the versions of the master data.
+}

@@ -1,0 +1,20 @@
+meta {
+  name: Yield breakdown
+  type: http
+  seq: 6
+}
+
+get {
+  url: {{appUrl}}/api/yield/breakdown
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.months: isArray
+}
+
+docs {
+  Energy per month and hours per wind speed class of the current window.
+}

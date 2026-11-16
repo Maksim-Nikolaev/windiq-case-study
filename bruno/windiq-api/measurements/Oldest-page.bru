@@ -1,0 +1,36 @@
+meta {
+  name: Oldest page
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/v1/measurements?limit=500
+  body: none
+  auth: bearer
+}
+
+params:query {
+  limit: 500
+  ~cursor: {{nextCursor}}
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+script:post-response {
+  bru.setVar("nextCursor", res.body.next_cursor);
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: isArray
+}
+
+docs {
+  Without a filter the list starts at the oldest value, sorted by timestamp.
+  The backfill and the daily reconciliation read all pages of this list.
+  The script stores next_cursor in the variable nextCursor.
+  Enable the cursor parameter to get the next page. A null next_cursor means the last page.
+}

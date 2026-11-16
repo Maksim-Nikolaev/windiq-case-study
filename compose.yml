@@ -1,0 +1,73 @@
+name: windiq
+
+services:
+  db:
+    image: postgres:18.6
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-windiq}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-windiq}
+      POSTGRES_DB: ${POSTGRES_DB:-windiq}
+    ports:
+      - "127.0.0.1:5442:5432"
+    volumes:
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  migrator:
+    build:
+      context: .
+      target: api
+    command: ["node", "src/migrate.ts"]
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-windiq}:${POSTGRES_PASSWORD:-windiq}@db:5432/${POSTGRES_DB:-windiq}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      target: api
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-windiq}:${POSTGRES_PASSWORD:-windiq}@db:5432/${POSTGRES_DB:-windiq}
+      WINDIQ_BASE_URL: ${LOCAL_WINDIQ_BASE_URL:-http://fake-upstream:4010}
+      WINDIQ_CLIENT_ID: ${LOCAL_WINDIQ_CLIENT_ID:-wiq_fake}
+      WINDIQ_CLIENT_SECRET: ${LOCAL_WINDIQ_CLIENT_SECRET:-fake-secret}
+      POLL_INTERVAL_SECONDS: ${POLL_INTERVAL_SECONDS:-60}
+    depends_on:
+      migrator:
+        condition: service_completed_successfully
+    ports:
+      - "127.0.0.1:8091:8080"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      target: web
+    environment:
+      API_INTERNAL_URL: http://api:8080
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3091:3000"
+    restart: unless-stopped
+
+  fake-upstream:
+    profiles: [fake]
+    build:
+      context: .
+      target: fake-upstream
+    ports:
+      - "127.0.0.1:4011:4010"
+    restart: unless-stopped
+
+volumes:
+  db-data:

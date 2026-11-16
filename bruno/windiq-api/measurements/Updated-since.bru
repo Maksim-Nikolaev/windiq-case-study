@@ -1,0 +1,31 @@
+meta {
+  name: Updated since
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/v1/measurements?updated_since=2026-11-16T00:00:00Z&limit=500
+  body: none
+  auth: bearer
+}
+
+params:query {
+  updated_since: 2026-11-16T00:00:00Z
+  limit: 500
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: isArray
+}
+
+docs {
+  Values with updated_at >= updated_since, sorted by updated_at (change time).
+  This is the change feed. It returns new values and corrected old values (version > 1).
+  The poll that runs each 60 s uses this filter.
+}

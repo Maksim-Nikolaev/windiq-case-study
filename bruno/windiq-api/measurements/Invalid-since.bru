@@ -1,0 +1,27 @@
+meta {
+  name: Invalid since
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/v1/measurements?since=not-a-date
+  body: none
+  auth: bearer
+}
+
+params:query {
+  since: not-a-date
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: in [400, 422]
+}
+
+docs {
+  Shows the error format of the API for an invalid parameter.
+}

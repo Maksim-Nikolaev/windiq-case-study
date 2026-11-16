@@ -1,0 +1,34 @@
+meta {
+  name: Token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/auth/token
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "client_id": "{{clientId}}",
+    "client_secret": "{{clientSecret}}"
+  }
+}
+
+script:post-response {
+  bru.setVar("accessToken", res.body.access_token);
+}
+
+assert {
+  res.status: eq 200
+  res.body.access_token: isString
+  res.body.expires_in: isNumber
+}
+
+docs {
+  Exchanges the client credentials for a bearer token.
+  The script stores the token in the variable accessToken. Run this request first.
+  expires_in is the token lifetime in seconds.
+}

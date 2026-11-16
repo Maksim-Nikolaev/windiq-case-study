@@ -1,0 +1,24 @@
+meta {
+  name: No token
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/v1/measurements?limit=1
+  body: none
+  auth: none
+}
+
+params:query {
+  limit: 1
+}
+
+assert {
+  res.status: eq 401
+  res.body.detail: isString
+}
+
+docs {
+  Shows the response for a request without a token. The client must get a new token on HTTP 401.
+}

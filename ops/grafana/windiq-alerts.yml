@@ -1,0 +1,135 @@
+# Copy to platform/observability/grafana/provisioning/alerting/windiq.yml.
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: windiq-ingest
+    folder: WindIQ
+    interval: 1m
+    rules:
+      - uid: windiq-data-stale
+        title: WindIQ has no current valid measurement
+        condition: C
+        for: 5m
+        labels:
+          project: windiq
+          type: ingest
+          severity: critical
+        annotations:
+          summary: "The latest valid measurement hour is {{ humanizeDuration $values.B.Value }} old. The source publishes one value per hour; the dashboard shows an old result."
+        noDataState: Alerting
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: time() - windiq_latest_valid_measurement_timestamp_seconds
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [9000] }
+
+      - uid: windiq-ingest-failing
+        title: WindIQ ingest fails
+        condition: C
+        for: 2m
+        labels:
+          project: windiq
+          type: ingest
+          severity: warning
+        annotations:
+          summary: "No successful measurement ingest for {{ humanizeDuration $values.B.Value }}. The stored data stays available; the next good run fills the gap."
+        noDataState: Alerting
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: time() - windiq_last_successful_poll_timestamp_seconds
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [900] }
+
+      - uid: windiq-rows-rejected
+        title: WindIQ rejects measurement rows
+        condition: C
+        for: 0s
+        labels:
+          project: windiq
+          type: data-quality
+          severity: info
+        annotations:
+          summary: "{{ humanize $values.B.Value }} measurement rows were rejected in the last hour. The Gutachter view lists each row with its reason."
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 3600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: sum(increase(windiq_measurement_rows_total{change="rejected"}[1h]))
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }
+
+      - uid: windiq-master-data-rejected
+        title: WindIQ rejects master data
+        condition: C
+        for: 0s
+        labels:
+          project: windiq
+          type: data-quality
+          severity: warning
+        annotations:
+          summary: "The latest {{ $labels.kind }} data from the source is not plausible. The calculation uses the previous version; the Gutachter view shows the reason."
+        noDataState: OK
+        execErrState: Error
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              refId: A
+              instant: true
+              expr: windiq_master_data_rejected
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: { type: gt, params: [0] }

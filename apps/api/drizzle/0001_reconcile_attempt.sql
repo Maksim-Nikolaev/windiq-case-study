@@ -1,0 +1,1 @@
+ALTER TABLE "ingest_state" ADD COLUMN "last_reconcile_attempt_at" timestamp with time zone;

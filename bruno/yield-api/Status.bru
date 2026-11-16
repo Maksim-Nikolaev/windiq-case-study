@@ -1,0 +1,20 @@
+meta {
+  name: Status
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{appUrl}}/api/status
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.dataFreshness: isString
+}
+
+docs {
+  Age of the latest valid measurement hour, rejected master data, and the last 30 ingest runs. The page /status shows the same data.
+}

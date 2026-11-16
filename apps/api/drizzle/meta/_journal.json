@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1794843077140,
+      "tag": "0000_clever_sleeper",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1794849192402,
+      "tag": "0001_reconcile_attempt",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794850694359,
+      "tag": "0002_master_data_record",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1794944069171,
+      "tag": "0003_gap_filling",
+      "breakpoints": true
+    }
+  ]
+}

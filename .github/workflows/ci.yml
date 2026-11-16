@@ -1,0 +1,117 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    container: node:26.13.1-alpine
+    services:
+      postgres:
+        image: postgres:18.6
+        env:
+          POSTGRES_USER: windiq
+          POSTGRES_PASSWORD: windiq
+          POSTGRES_DB: windiq
+        options: >-
+          --health-cmd "pg_isready -U windiq"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      TEST_DATABASE_URL: postgres://windiq:windiq@postgres:5432/windiq_test
+    steps:
+      - name: Git for the checkout
+        run: apk add --no-cache git
+
+      - uses: actions/checkout@v7
+
+      - name: Install
+        run: |
+          npm install --global pnpm@12.21.0
+          pnpm install --frozen-lockfile
+
+      - name: Lint, type check, unit tests and integration tests
+        run: pnpm check
+
+      - name: The committed API specification and the web types are current
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          pnpm openapi
+          git diff --exit-code -- apps/api/openapi.json apps/web/src/api-schema.d.ts
+
+  e2e:
+    runs-on: ubuntu-24.04
+    env:
+      POLL_INTERVAL_SECONDS: 2
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Start the production images with the fake upstream
+        run: docker compose --profile fake up --build --detach --wait
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26.13.1
+
+      - name: Install
+        run: |
+          npm install --global pnpm@12.21.0
+          pnpm install --frozen-lockfile
+          pnpm --filter @windiq/web exec playwright install --with-deps chromium
+
+      - name: Browser tests
+        run: pnpm --filter @windiq/web e2e
+
+      - name: Container logs
+        if: failure()
+        run: docker compose --profile fake logs --tail 200
+
+  image:
+    needs: [check, e2e]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        target: [api, web]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: docker/setup-buildx-action@v4
+
+      # GHCR rejects mixed-case image refs; github.repository_owner keeps case.
+      - name: Lowercase owner
+        id: owner
+        run: echo "name=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ghcr.io/${{ steps.owner.outputs.name }}/windiq-${{ matrix.target }}
+          tags: |
+            type=raw,value=main
+            type=sha,prefix=sha-,format=short
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: ${{ matrix.target }}
+          build-args: APP_VERSION=${{ github.sha }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.target }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.target }}
+          platforms: linux/amd64

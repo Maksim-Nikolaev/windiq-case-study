@@ -1,0 +1,20 @@
+meta {
+  name: Yield history
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{appUrl}}/api/yield/history
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.points: isArray
+}
+
+docs {
+  Each new calculation of the last 30 days.
+}

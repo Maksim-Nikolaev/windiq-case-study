@@ -1,0 +1,30 @@
+meta {
+  name: Since
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/v1/measurements?since=2026-11-15T00:00:00Z&limit=500
+  body: none
+  auth: bearer
+}
+
+params:query {
+  since: 2026-11-15T00:00:00Z
+  limit: 500
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+assert {
+  res.status: eq 200
+  res.body.data: isArray
+}
+
+docs {
+  Values with timestamp >= since, sorted by timestamp (measurement time).
+  The application does not use this filter. The backfill and the daily reconciliation read the list without a filter (see Oldest page).
+}

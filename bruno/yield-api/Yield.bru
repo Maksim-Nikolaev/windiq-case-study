@@ -1,0 +1,20 @@
+meta {
+  name: Yield
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{appUrl}}/api/yield
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.state: isString
+}
+
+docs {
+  The current result (AEP gross, AEP net, P50, P90) with the inputs and the hour counts. The state is pending until the first complete backfill.
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@windiq/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev --port 3090",
+    "build": "next build",
+    "start": "next start",
+    "api-types": "openapi-typescript ../api/openapi.json -o src/api-schema.d.ts",
+    "typecheck": "tsc --noEmit",
+    "e2e": "playwright test"
+  },
+  "dependencies": {
+    "echarts": "6.1.0",
+    "next": "16.4.6",
+    "openapi-fetch": "0.17.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.1",
+    "@types/node": "26.6.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "openapi-typescript": "7.13.0",
+    "typescript": "6.0.3"
+  }
+}

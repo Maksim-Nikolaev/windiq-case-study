@@ -1,0 +1,10 @@
+**/node_modules
+**/.next
+**/test-results
+**/playwright-report
+**/*.tsbuildinfo
+.git
+.env
+.env.*
+_assets
+bruno

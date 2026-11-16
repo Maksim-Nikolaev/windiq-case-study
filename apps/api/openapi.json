@@ -1,0 +1,1009 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "WindIQ case study – yield API",
+    "version": "1.0.0",
+    "description": "Read-only API of the yield service. The service stores the hourly mast measurements and calculates AEP, P50 and P90."
+  },
+  "servers": [
+    {
+      "url": "/api"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Yield",
+      "description": "The annual energy production and its parts."
+    },
+    {
+      "name": "Data quality",
+      "description": "What the source delivered and what the service did with it."
+    },
+    {
+      "name": "Operations",
+      "description": "Health, ingest state and the live event stream."
+    }
+  ],
+  "components": {
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "YieldOverview": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "pending"
+                ],
+                "description": "No result before the first complete fetch."
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "state": {
+                "type": "string",
+                "enum": [
+                  "ready"
+                ]
+              },
+              "result": {
+                "$ref": "#/components/schemas/YieldResult"
+              },
+              "inputs": {
+                "$ref": "#/components/schemas/YieldInputs"
+              },
+              "hours": {
+                "type": "object",
+                "properties": {
+                  "valid": {
+                    "type": "integer"
+                  },
+                  "missing": {
+                    "type": "integer"
+                  },
+                  "invalid": {
+                    "type": "integer"
+                  },
+                  "absent": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "valid",
+                  "missing",
+                  "invalid",
+                  "absent"
+                ],
+                "description": "Hours of the window by state: valid, delivered without a value, delivered with an invalid value, not delivered."
+              }
+            },
+            "required": [
+              "state",
+              "result",
+              "inputs",
+              "hours"
+            ]
+          }
+        ]
+      },
+      "YieldResult": {
+        "type": "object",
+        "properties": {
+          "computedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-16T12:00:00.000Z",
+            "description": "Time of the calculation."
+          },
+          "windowStart": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-16T12:00:00.000Z",
+            "description": "Start of the first hour of the 12-month window (UTC)."
+          },
+          "windowEnd": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-16T12:00:00.000Z",
+            "description": "Start of the latest delivered measurement hour, the last hour of the window (UTC)."
+          },
+          "grossMwh": {
+            "type": "number",
+            "description": "AEP gross in MWh: power curve energy of all hours of the window, with the gaps filled."
+          },
+          "netMwh": {
+            "type": "number",
+            "description": "AEP net in MWh: gross × (1 − availability) × (1 − electrical) × (1 − wake)."
+          },
+          "p50Mwh": {
+            "type": "number",
+            "description": "P50 in MWh, equal to AEP net."
+          },
+          "p90Mwh": {
+            "type": "number",
+            "description": "P90 in MWh: P50 × (1 − 1.282 × U)."
+          },
+          "lossFactor": {
+            "type": "number",
+            "description": "Share of the gross energy that remains after the three losses, 0–1."
+          },
+          "expectedHours": {
+            "type": "integer",
+            "description": "Hours in the window: 8760, or 8784 with 29 February."
+          },
+          "validHours": {
+            "type": "integer",
+            "description": "Hours in the window with a valid wind speed."
+          },
+          "coverage": {
+            "type": "number",
+            "description": "Share of the expected hours with a valid value, 0–1."
+          },
+          "measuredGrossMwh": {
+            "type": "number",
+            "description": "Power curve energy in MWh of the hours with a valid value only, without filling."
+          },
+          "interpolatedHours": {
+            "type": "integer",
+            "description": "Hours in a gap of up to 3 hours: the wind speed is interpolated linearly between the neighbouring hours."
+          },
+          "monthMeanHours": {
+            "type": "integer",
+            "description": "Hours in a longer gap: they get the mean energy of the valid hours of the same calendar month."
+          },
+          "meanHubWindSpeedMs": {
+            "type": "number",
+            "description": "Mean wind speed at hub height of the valid hours, m/s."
+          },
+          "capacityFactor": {
+            "type": "number",
+            "description": "Full-load hours divided by the hours of the window, share 0–1, from P50."
+          },
+          "fullLoadHours": {
+            "type": "number",
+            "description": "P50 divided by the rated power, in hours per year."
+          }
+        },
+        "required": [
+          "computedAt",
+          "windowStart",
+          "windowEnd",
+          "grossMwh",
+          "netMwh",
+          "p50Mwh",
+          "p90Mwh",
+          "lossFactor",
+          "expectedHours",
+          "validHours",
+          "coverage",
+          "measuredGrossMwh",
+          "interpolatedHours",
+          "monthMeanHours",
+          "meanHubWindSpeedMs",
+          "capacityFactor",
+          "fullLoadHours"
+        ]
+      },
+      "YieldInputs": {
+        "type": "object",
+        "properties": {
+          "mast": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "latitude": {
+                "type": "number"
+              },
+              "longitude": {
+                "type": "number"
+              },
+              "measurementHeightM": {
+                "type": "number",
+                "description": "Measurement height above ground, m."
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "latitude",
+              "longitude",
+              "measurementHeightM"
+            ]
+          },
+          "turbine": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "ratedPowerKw": {
+                "type": "number",
+                "description": "Rated power, kW."
+              },
+              "hubHeightM": {
+                "type": "number",
+                "description": "Hub height above ground, m."
+              },
+              "rotorDiameterM": {
+                "type": "number",
+                "description": "Rotor diameter, m."
+              },
+              "cutInMs": {
+                "type": "number",
+                "description": "Below this hub wind speed the power is 0 kW, m/s."
+              },
+              "cutOutMs": {
+                "type": "number",
+                "description": "Above this hub wind speed the power is 0 kW, m/s."
+              },
+              "powerCurve": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "windSpeedMs": {
+                      "type": "number"
+                    },
+                    "powerKw": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "windSpeedMs",
+                    "powerKw"
+                  ]
+                },
+                "description": "Power at hub height wind speeds; linear between the points."
+              },
+              "version": {
+                "type": "integer",
+                "description": "Version of the data set at the source."
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-11-16T12:00:00.000Z",
+                "description": "Last change of the data set at the source."
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "ratedPowerKw",
+              "hubHeightM",
+              "rotorDiameterM",
+              "cutInMs",
+              "cutOutMs",
+              "powerCurve",
+              "version",
+              "updatedAt"
+            ]
+          },
+          "site": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "shearExponent": {
+                "type": "number",
+                "description": "Shear exponent α in v_hub = v_measured × (h_hub / h_measured) ^ α."
+              },
+              "losses": {
+                "type": "object",
+                "properties": {
+                  "availability": {
+                    "type": "number"
+                  },
+                  "electrical": {
+                    "type": "number"
+                  },
+                  "wake": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "availability",
+                  "electrical",
+                  "wake"
+                ],
+                "description": "Loss shares, 0–1 (0.03 = 3 %)."
+              },
+              "uncertainty": {
+                "type": "number",
+                "description": "Total uncertainty U as a share, 0–1."
+              },
+              "version": {
+                "type": "integer",
+                "description": "Version of the data set at the source."
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-11-16T12:00:00.000Z",
+                "description": "Last change of the data set at the source."
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "shearExponent",
+              "losses",
+              "uncertainty",
+              "version",
+              "updatedAt"
+            ]
+          }
+        },
+        "required": [
+          "mast",
+          "turbine",
+          "site"
+        ]
+      },
+      "YieldHistory": {
+        "type": "object",
+        "properties": {
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "computedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2026-11-16T12:00:00.000Z"
+                },
+                "windowEnd": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2026-11-16T12:00:00.000Z"
+                },
+                "grossMwh": {
+                  "type": "number"
+                },
+                "p50Mwh": {
+                  "type": "number"
+                },
+                "p90Mwh": {
+                  "type": "number"
+                },
+                "validHours": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "computedAt",
+                "windowEnd",
+                "grossMwh",
+                "p50Mwh",
+                "p90Mwh",
+                "validHours"
+              ]
+            }
+          }
+        },
+        "required": [
+          "points"
+        ]
+      },
+      "YieldBreakdown": {
+        "type": "object",
+        "properties": {
+          "months": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "month": {
+                  "type": "string",
+                  "description": "Calendar month in UTC, YYYY-MM. The first and last can be partial."
+                },
+                "expectedHours": {
+                  "type": "integer"
+                },
+                "validHours": {
+                  "type": "integer"
+                },
+                "grossMwh": {
+                  "type": "number",
+                  "description": "AEP gross of the month in MWh, with the gaps filled."
+                },
+                "netMwh": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "month",
+                "expectedHours",
+                "validHours",
+                "grossMwh",
+                "netMwh"
+              ]
+            }
+          },
+          "windSpeedBins": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "fromMs": {
+                  "type": "number",
+                  "description": "Lower limit of the 1 m/s class of the hub wind speed."
+                },
+                "hours": {
+                  "type": "integer",
+                  "description": "Hours with a valid value in this class."
+                },
+                "grossMwh": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "fromMs",
+                "hours",
+                "grossMwh"
+              ]
+            }
+          }
+        },
+        "required": [
+          "months",
+          "windSpeedBins"
+        ]
+      },
+      "DataQuality": {
+        "type": "object",
+        "properties": {
+          "unusableHours": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "measuredAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2026-11-16T12:00:00.000Z"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "missing",
+                    "invalid"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "not_numeric, unknown_unit, negative or implausible; null for a missing value."
+                },
+                "rawValue": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "description": "The value as the source sent it."
+                },
+                "rawUnit": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "measuredAt",
+                "status",
+                "reason",
+                "rawValue",
+                "rawUnit",
+                "version"
+              ]
+            }
+          },
+          "corrections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "measuredAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2026-11-16T12:00:00.000Z"
+                },
+                "revisions": {
+                  "type": "integer"
+                },
+                "latestVersion": {
+                  "type": "integer"
+                },
+                "firstWindSpeedMs": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "currentWindSpeedMs": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "correctedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2026-11-16T12:00:00.000Z"
+                }
+              },
+              "required": [
+                "measuredAt",
+                "revisions",
+                "latestVersion",
+                "firstWindSpeedMs",
+                "currentWindSpeedMs",
+                "correctedAt"
+              ]
+            }
+          },
+          "rejectedRows": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "reason": {
+                  "type": "string",
+                  "description": "schema, unparseable, missing_offset, not_on_hour or in_future."
+                },
+                "payload": {
+                  "type": "string",
+                  "description": "The row as the source sent it, as JSON text."
+                },
+                "firstSeenAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2026-11-16T12:00:00.000Z"
+                },
+                "lastSeenAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2026-11-16T12:00:00.000Z"
+                }
+              },
+              "required": [
+                "reason",
+                "payload",
+                "firstSeenAt",
+                "lastSeenAt"
+              ]
+            }
+          },
+          "masterDataVersions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "mast",
+                    "turbine",
+                    "site"
+                  ]
+                },
+                "accepted": {
+                  "type": "boolean"
+                },
+                "rejectReason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "upstreamVersion": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "upstreamUpdatedAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time",
+                  "example": "2026-11-16T12:00:00.000Z"
+                },
+                "fetchedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2026-11-16T12:00:00.000Z"
+                }
+              },
+              "required": [
+                "kind",
+                "accepted",
+                "rejectReason",
+                "upstreamVersion",
+                "upstreamUpdatedAt",
+                "fetchedAt"
+              ]
+            }
+          }
+        },
+        "required": [
+          "unusableHours",
+          "corrections",
+          "rejectedRows",
+          "masterDataVersions"
+        ]
+      },
+      "Status": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "description": "Git commit of the running release."
+          },
+          "startedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-16T12:00:00.000Z",
+            "description": "Start of the API process."
+          },
+          "now": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-16T12:00:00.000Z"
+          },
+          "dataFreshness": {
+            "type": "string",
+            "enum": [
+              "fresh",
+              "stale",
+              "empty"
+            ],
+            "description": "fresh while the latest valid measurement hour is at most 150 minutes old; empty before the first data."
+          },
+          "dataAgeMinutes": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Minutes since the start of the latest valid hour."
+          },
+          "latestValidMeasurementAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "example": "2026-11-16T12:00:00.000Z"
+          },
+          "rejectedMasterData": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "mast",
+                "turbine",
+                "site"
+              ]
+            },
+            "description": "Kinds whose latest version from the source is not plausible and not used."
+          },
+          "lastPollSuccessAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "example": "2026-11-16T12:00:00.000Z",
+            "description": "Last measurement fetch without an error."
+          },
+          "lastReconcileAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "example": "2026-11-16T12:00:00.000Z",
+            "description": "Last complete read of the full list."
+          },
+          "runsLast24h": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              }
+            },
+            "required": [
+              "total",
+              "failed"
+            ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "backfill",
+                    "poll",
+                    "reconcile",
+                    "master_data"
+                  ]
+                },
+                "startedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "example": "2026-11-16T12:00:00.000Z"
+                },
+                "durationMs": {
+                  "type": "integer"
+                },
+                "outcome": {
+                  "type": "string",
+                  "enum": [
+                    "ok",
+                    "failed"
+                  ]
+                },
+                "errorMessage": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rowsNew": {
+                  "type": "integer"
+                },
+                "rowsCorrected": {
+                  "type": "integer"
+                },
+                "rowsRejected": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "startedAt",
+                "durationMs",
+                "outcome",
+                "errorMessage",
+                "rowsNew",
+                "rowsCorrected",
+                "rowsRejected"
+              ]
+            }
+          }
+        },
+        "required": [
+          "version",
+          "startedAt",
+          "now",
+          "dataFreshness",
+          "dataAgeMinutes",
+          "latestValidMeasurementAt",
+          "rejectedMasterData",
+          "lastPollSuccessAt",
+          "lastReconcileAt",
+          "runsLast24h",
+          "runs"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "The process is alive",
+        "description": "Answers while the process runs. It checks neither the database nor the WindIQ API.",
+        "responses": {
+          "200": {
+            "description": "The process is alive",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "The process can reach the database",
+        "description": "Docker and Traefik use this check. It does not depend on the WindIQ API, so an outage of the source does not remove the service.",
+        "responses": {
+          "200": {
+            "description": "Ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The database is not reachable"
+          }
+        }
+      }
+    },
+    "/yield": {
+      "get": {
+        "tags": [
+          "Yield"
+        ],
+        "summary": "Current annual yield with inputs",
+        "description": "AEP gross, AEP net, P50 and P90 of the latest 12 months, with the mast, turbine and site data that the calculation used and the hours by state. The state is pending until the first complete fetch.",
+        "responses": {
+          "200": {
+            "description": "Current annual yield with inputs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YieldOverview"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/yield/history": {
+      "get": {
+        "tags": [
+          "Yield"
+        ],
+        "summary": "Yield results of the last 30 days",
+        "description": "One point for each new result: a new measurement hour, a correction or new master data. Unchanged results are not stored again.",
+        "responses": {
+          "200": {
+            "description": "Yield results of the last 30 days",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YieldHistory"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/yield/breakdown": {
+      "get": {
+        "tags": [
+          "Yield"
+        ],
+        "summary": "Yield by month and wind speed",
+        "description": "Gross and net energy per calendar month of the window, and valid hours and gross energy per 1 m/s class of the hub wind speed.",
+        "responses": {
+          "200": {
+            "description": "Yield by month and wind speed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YieldBreakdown"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/quality": {
+      "get": {
+        "tags": [
+          "Data quality"
+        ],
+        "summary": "Unusable hours, corrections and rejected rows",
+        "description": "The newest 100 entries of each list: hours without a valid value, hours that the source corrected, rows that the service rejected, and the versions of the master data.",
+        "responses": {
+          "200": {
+            "description": "Unusable hours, corrections and rejected rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataQuality"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Ingest state and data freshness",
+        "description": "Age of the latest valid measurement hour, rejected master data, the last 30 ingest runs and the failures of the last 24 hours. The page /status shows the same data.",
+        "responses": {
+          "200": {
+            "description": "Ingest state and data freshness",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Status"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/events": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Live events (server-sent events)",
+        "description": "A text/event-stream. Events: `ready` once after the connection opens, `data.changed` when a new result exists, `cycle.finished` after each ingest cycle (about each 60 s), `ping` each 20 s. The data of each event is the server time (ISO 8601). Clients fetch the changed data from the JSON endpoints.",
+        "responses": {
+          "200": {
+            "description": "An open event stream",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

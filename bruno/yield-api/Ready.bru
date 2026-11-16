@@ -1,0 +1,20 @@
+meta {
+  name: Ready
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{appUrl}}/api/readyz
+  body: none
+  auth: none
+}
+
+assert {
+  res.status: eq 200
+  res.body.status: eq ok
+}
+
+docs {
+  The process reaches the database. Docker and Traefik use this endpoint. It returns HTTP 503 when the database is not reachable.
+}
